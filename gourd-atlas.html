@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projection Pumpkins</title>
+<style>
+  :root { --bg: #f4f2f7; --panel: #fff; --ink: #1a1424; --muted: #6d6580; --line: #ddd7e6; --accent: #6a22c8; --on-accent: #fff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #14101c; --panel: #1e1830; --ink: #f1edf8; --muted: #a79fba; --line: #342b4a; --accent: #a874ff; --on-accent: #14101c; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #14101c; --panel: #1e1830; --ink: #f1edf8; --muted: #a79fba; --line: #342b4a; --accent: #a874ff; --on-accent: #14101c; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  .app { display: flex; gap: 24px; padding: 16px; max-width: 1100px; margin: 0 auto; align-items: flex-start; }
+  .stage { flex: 1 1 auto; min-width: 0; display: flex; justify-content: center; }
+  .wrap { width: 100%; max-width: 600px; }
+  #hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); min-height: 1.4em; }
+  select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; }
+  canvas { touch-action: none; cursor: grab; width: 100%; max-width: 600px; height: auto; display: block; box-shadow: 0 8px 30px rgba(0,0,0,.25); image-rendering: auto; }
+  .panel { flex: 0 0 280px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; position: sticky; top: 16px; }
+  h1 { font-size: 16px; margin: 0 0 12px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  label output { float: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  input[type=text] { text-overflow: ellipsis; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); font: inherit; text-transform: uppercase; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .colors { display: flex; gap: 8px; flex-wrap: wrap; }
+  .colors label { flex: 1 1 45%; margin: 12px 0 0; }
+  input[type=color] { width: 100%; height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: transparent; }
+  .row { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  button { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  button:hover { filter: brightness(1.08); }
+  .check { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--ink); font-size: 13px; }
+  @media (max-width: 760px) { .app { flex-direction: column-reverse; } .panel { position: static; flex-basis: auto; width: 100%; } }
+  body { margin: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="stage"><div class="wrap"><canvas id="poster" aria-label="Постер з проєкціями"></canvas><p id="hint"></p></div></div>
+  <aside class="panel">
+    <h1>Projection Pumpkins</h1>
+    <label for="title">Текст рамки</label>
+    <input id="title" type="text" value="Spooky sweets • a tasty little collection of Halloween treats • brain bites • vampire chompers • sugar skull eyeball treats • ghost goo • pumpkin pop trick or treat! •">
+    <label for="speed">Швидкість <output id="speedO"></output></label>
+    <input id="speed" type="range" min="-120" max="120" value="40">
+    <label for="ribs">Ребра, крок° <output id="ribsO"></output></label>
+    <input id="ribs" type="range" min="0" max="45" step="1" value="12">
+    <label for="chaos">Розкид швидкостей <output id="chaosO"></output></label>
+    <input id="chaos" type="range" min="0" max="100" value="35">
+    <label for="elastic">Еластичні ривки <output id="elasticO"></output></label>
+    <input id="elastic" type="range" min="0" max="100" value="50">
+    <label for="preset">Пресет</label>
+    <select id="preset">
+      <option value="halloween">Гарбузи: Halloween</option>
+      <option value="toxic">Гарбузи: Toxic</option>
+      <option value="ice">Гарбузи: Ice</option>
+      <option value="gum">Гарбузи: Bubblegum</option>
+      <option value="mono">Гарбузи: Mono</option>
+      <option value="cat">Чорні коти</option>
+      <option value="ghost">Привиди</option>
+    </select>
+    <div class="colors">
+      <label>Фон<input id="cBg" type="color" value="#2b46d1"></label>
+      <label>Гарбуз<input id="cFill" type="color" value="#ff6a13"></label>
+      <label>Акцент<input id="cAcc" type="color" value="#ff6a1f"></label>
+      <label>Текст<input id="cText" type="color" value="#ffffff"></label>
+      <label>Світло<input id="cGlow" type="color" value="#ffd54a"></label>
+    </div>
+    <label class="check"><input id="stems" type="checkbox" checked> Деталі зверху</label>
+    <div class="row">
+      <button id="play" class="primary">Пауза</button>
+    </div>
+  </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-geo-projection@4.0.0/dist/d3-geo-projection.min.js"></script>
+<script>
+(() => {
+  const S = 2, PW = 600, PH = 756;                       // poster logical size and pixel scale
+  const TW = 2048, TH = 1024;                            // equirectangular text texture
+
+  // [label, projection factory, box x, y, w, h] — layout in poster units
+  // three staggered columns, 6-unit gutters, 24-unit margin for the text ribbon
+  const TILES = [
+    ["Hill Eucyclic",       () => d3.geoHill(),            24,  24, 212, 150],
+    ["Van der Grinten",     () => d3.geoVanDerGrinten(),  242,  24, 170, 200],
+    ["Fahey",               () => d3.geoFahey(),          418,  24, 158,  90],
+    ["Larrivée",            () => d3.geoLarrivee(),       418, 120, 158, 180],
+    ["Sinusoidal",          () => d3.geoSinusoidal(),      24, 180, 212,  80],
+    ["Loximuthal",          () => d3.geoLoximuthal(),     242, 230, 170,  90],
+    ["Bonne",               () => d3.geoBonne(),           24, 266, 212, 204],
+    ["Eckert IV",           () => d3.geoEckert4(),        242, 326, 170, 170],
+    ["Hammer",              () => d3.geoHammer(),         418, 306, 158, 190],
+    ["Ginzburg IV",         () => d3.geoGinzburg4(),      242, 502, 170,  90],
+    ["Eckert V",            () => d3.geoEckert5(),        418, 502, 158, 230],
+    ["August Epicycloidal", () => d3.geoAugust(),          24, 476, 212, 256],
+    ["Wagner VII",          () => d3.geoWagner7(),        242, 598, 170, 134],
+  ];
+
+  const $ = id => document.getElementById(id);
+  const canvas = $("poster"), ctx = canvas.getContext("2d", { willReadFrequently: false });
+  canvas.width = PW * S; canvas.height = PH * S;
+
+  const hex32 = h => { const n = parseInt(h.slice(1), 16); return (0xff << 24) | ((n & 255) << 16) | (n & 0xff00) | (n >> 16); };
+  const state = { title: "Spooky sweets • a tasty little collection of Halloween treats • brain bites • vampire chompers • sugar skull eyeball treats • ghost goo • pumpkin pop trick or treat! •", speed: 40, repeat: 1, ribs: 12, chaos: 35, elastic: 50, stems: true,
+                  bg: hex32("#6a22c8"), fill: hex32("#ff6a13"), kind: "pumpkin", c5: hex32("#6a55b8"), c3: hex32("#ff6a1f"), c4: hex32("#ffffff"), bgHex: "#2b46d1", ribHex: "#ff4f9a", textHex: "#ffffff", playing: true, fillHex: "#ff6a13", glowHex: "#ffd54a", glow: hex32("#ffd54a") };
+
+  // carved jack-o\'-lantern face in tile-normalised coords (u, v in -1..1, v down). g grows the shapes for the glow rim.
+  const inTri = (px, py, a, b, c, g) => {
+    const mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3, k = 1 + g;
+    const P = [a, b, c].map(p => [mx + (p[0] - mx) * k, my + (p[1] - my) * k]);
+    const s = (p, q) => (px - q[0]) * (p[1] - q[1]) - (p[0] - q[0]) * (py - q[1]);
+    const d1 = s(P[0], P[1]), d2 = s(P[1], P[2]), d3 = s(P[2], P[0]);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+  };
+  // four expressions; k picks one. Coordinates are u, v in -1..1 with v pointing down.
+  const faceAt = (u, v, g, k) => {
+    const tri = (a, b, c) => inTri(u, v, a, b, c, g);
+    const pair = (a, b, c) => tri(a, b, c) || tri([-a[0], a[1]], [-b[0], b[1]], [-c[0], c[1]]);
+    const gr = g * .1;
+    if (k === 1) { for (const cx of [-.3, .3]) if (((u - cx) / (.15 + gr)) ** 2 + ((v + .18) / (.17 + gr)) ** 2 < 1) return true; }
+    else if (k === 2) { if (pair([-.46, -.3], [-.1, -.08], [-.46, -.06])) return true; }
+    else if (k === 3) { if (pair([-.38, -.08], [-.18, -.08], [-.28, -.32])) return true; }
+    else if (pair([-.42, -.05], [-.14, -.05], [-.28, -.38])) return true;
+    if (tri([0, .02], [-.1, .21], [.1, .21])) return true;
+    if (k === 3) return (u / (.2 + gr)) ** 2 + ((v - .45) / (.22 + gr)) ** 2 < 1;
+    if (Math.abs(u) > .58 + g * .12) return false;
+    const c = .5 - .9 * u * u, h = .05 + .1 * (1 - (u / .6) ** 2) + g * .14;
+    if (Math.abs(v - c) >= h) return false;
+    if (g === 0 && k === 0 && ((Math.abs(u) < .06 && v < c) || ((Math.abs(u - .27) < .05 || Math.abs(u + .27) < .05) && v > c))) return false;
+    if (g === 0 && k === 2) for (const [p, up] of [[-.4, 1], [-.14, 0], [.14, 1], [.4, 0]]) if (Math.abs(u - p) < .05 && (up ? v < c : v > c)) return false;
+    return true;
+  };
+  const faceLevel = (u, v, k) => faceAt(u, v, 0, k) ? 1 : faceAt(u, v, .45, k) ? 2 : 0;
+  // levels: 1 glow colour, 2 glow spill, 3 accent colour, 4 white, 5 violet
+  const segDist = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy))); return Math.hypot(px - ax - t * dx, py - ay - t * dy); };
+  const catLevel = (u, v) => {
+    const s = Math.sign(u) || 1, dx = Math.abs(u) - .42;
+    // eyes: thick yellow horseshoes with a small white glint in the dark hollow
+    if (Math.hypot(dx - .01, v + .15) < .028 && dx > -.1) return 4;
+    if (v < -.14 ? ((dx / .2) ** 2 + ((v + .14) / .2) ** 2 < 1 && !((dx / .1) ** 2 + ((v + .14) / .11) ** 2 < 1)) : (v < .06 && Math.abs(dx) < .2 && Math.abs(dx) > .1)) return 1;
+    for (let i = 0; i < 3; i++) if (segDist(Math.abs(u), v, .24 + .09 * i, -.4, .28 + .11 * i, -.54) < .013) return 5;   // brow strokes
+    if (inTri(u, v, [-.12, .05], [.12, .05], [0, .21], 0)) return 3;                 // nose
+    for (const t of [-1, 1]) if (inTri(u, v, [t * .26 - .06, .3], [t * .26 + .06, .3], [t * .26, .45], 0)) return 4;   // fangs
+    if (v > .3 && v < .3 + .34 * Math.pow(Math.max(0, 1 - Math.abs(u) / .55), .7) && Math.abs(u) < .55) return 3;       // wide, shallow mouth
+    for (let i = 0; i < 3; i++) if (segDist(Math.abs(u), v, .3, .14 + .07 * i, .66, .15 + .12 * i) < .016) return 4;    // whiskers
+    return 0;
+  };
+  const ghostLevel = (u, v, k) => {
+    const ry = .17 * (1 + .12 * (k % 2));
+    for (const s of [-1, 1]) if (((u - s * .3) / .1) ** 2 + ((v + .08) / ry) ** 2 < 1) return 3;
+    return (u / .08) ** 2 + ((v - .3) / .11) ** 2 < 1 ? 3 : 0;
+  };
+  const levelAt = (u, v, k) => state.kind === "cat" ? catLevel(u, v) : state.kind === "ghost" ? ghostLevel(u, v, k) : faceLevel(u, v, k);
+
+  // equirectangular face textures (1 = carved light, 2 = light spilling onto the rind), one per expression
+  let texs = [];
+  function buildTextures() {
+    const n = state.repeat, half = Math.min(100, 165 / n), latHalf = 82;
+    texs = [0, 1, 2, 3].map(k => {
+      const t = new Uint8Array(TW * TH);
+      for (let r = 0; r < TH; r++) {
+        const lat = 90 - (r + .5) / TH * 180, v = -lat / latHalf;
+        if (Math.abs(v) > 1.6) continue;
+        for (let c = 0; c < TW; c++) {
+          const lon = c / TW * 360 - 180;
+          for (let f = 0; f < n; f++) {
+            const u = (((lon - f * 360 / n + 540) % 360) - 180) / half;
+            if (Math.abs(u) > 1.6) continue;
+            const lv = levelAt(u, v, k); if (lv) { t[r * TW + c] = lv; break; }
+          }
+        }
+      }
+      return t;
+    });
+  }
+
+  // ---- per-tile pixel maps: for each pixel inside the projected sphere, its lon/lat texel ----
+  const tiles = [];
+  function buildTile([name, make, bx, by, bw, bh], index) {
+    const proj = make();
+    const x0 = Math.floor(bx * S), y0 = Math.floor(by * S), w = Math.ceil(bw * S), h = Math.ceil(bh * S);
+    const sphere = { type: "Sphere" };
+    const b = d3.geoPath(proj).bounds(sphere);
+    const kx = w / (b[1][0] - b[0][0]), ky = h / (b[1][1] - b[0][1]);
+    const toPx = p => p && [(p[0] - b[0][0]) * kx, (p[1] - b[0][1]) * ky];
+
+    const colMap = new Float32Array(w * h).fill(-1), rowMap = new Int32Array(w * h);
+    const STEP = 1, NX = 360 / STEP + 1, NY = 180 / STEP + 1;
+    const pts = new Array(NX * NY);
+    for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) pts[j * NX + i] = toPx(proj([-180 + i * STEP, 90 - j * STEP]));
+    const maxEdge = Math.max(w, h) * 0.04;
+
+    const tri = (a, bb, c, la, lb, lc) => {
+      // la/lb/lc = [lon, lat]
+      const minx = Math.max(0, Math.floor(Math.min(a[0], bb[0], c[0]))), maxx = Math.min(w - 1, Math.ceil(Math.max(a[0], bb[0], c[0])));
+      const miny = Math.max(0, Math.floor(Math.min(a[1], bb[1], c[1]))), maxy = Math.min(h - 1, Math.ceil(Math.max(a[1], bb[1], c[1])));
+      const den = (bb[1] - c[1]) * (a[0] - c[0]) + (c[0] - bb[0]) * (a[1] - c[1]);
+      if (Math.abs(den) < 1e-9) return;
+      for (let y = miny; y <= maxy; y++) for (let x = minx; x <= maxx; x++) {
+        const px = x + .5, py = y + .5;
+        const u = ((bb[1] - c[1]) * (px - c[0]) + (c[0] - bb[0]) * (py - c[1])) / den;
+        const v = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / den;
+        const wv = 1 - u - v, e = -0.02;
+        if (u < e || v < e || wv < e) continue;
+        const lon = u * la[0] + v * lb[0] + wv * lc[0], lat = u * la[1] + v * lb[1] + wv * lc[1];
+        const k = y * w + x;
+        colMap[k] = (lon + 180) / 360 * TW;
+        rowMap[k] = Math.min(TH - 1, Math.max(0, ((90 - lat) / 180 * TH) | 0));
+      }
+    };
+    const ok = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < maxEdge;
+    for (let j = 0; j < NY - 1; j++) for (let i = 0; i < NX - 1; i++) {
+      const p00 = pts[j * NX + i], p10 = pts[j * NX + i + 1], p01 = pts[(j + 1) * NX + i], p11 = pts[(j + 1) * NX + i + 1];
+      if (!p00 || !p10 || !p01 || !p11) continue;
+      if (!ok(p00, p10) || !ok(p00, p01) || !ok(p11, p10) || !ok(p11, p01) || !ok(p00, p11)) continue;
+      const lo0 = -180 + i * STEP, lo1 = lo0 + STEP, la0 = 90 - j * STEP, la1 = la0 - STEP;
+      tri(p00, p10, p01, [lo0, la0], [lo1, la0], [lo0, la1]);
+      tri(p10, p11, p01, [lo1, la0], [lo1, la1], [lo0, la1]);
+    }
+    const cx = w >> 1; let sy = 0;
+    while (sy < h && colMap[sy * w + cx] < 0) sy++;
+    const colTop = x => { let yy = 0; while (yy < h && colMap[yy * w + x] < 0) yy++; return yy; };
+    const idx = [], col = [], row = [], dm = [], sp = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const k = y * w + x;
+      if (colMap[k] >= 0) {
+        const u = (x + .5 - w / 2) / (w / 2), v = (y + .5 - h / 2) / (h / 2), z = Math.sqrt(Math.max(0, 1 - Math.min(1, u * u + v * v)));
+        dm.push(.42 + .58 * Math.pow(z, .8)); sp.push(Math.exp(-((u + .38) ** 2 + (v + .42) ** 2) / .05));
+        idx.push(y * w + x); col.push(colMap[k]); row.push(rowMap[k] * TW); }
+    }
+
+    // ribs = meridians, drawn as vector strokes through the same non-uniform fit
+    const affine = d3.geoTransform({ point(x, y) { this.stream.point(x0 + (x - b[0][0]) * kx, y0 + (y - b[0][1]) * ky); } });
+    const path = d3.geoPath({ stream: s => proj.stream(affine.stream(s)) });
+    const tc = document.createElement("canvas"); tc.width = w; tc.height = h;
+    const tb = new Uint32Array(w * h);
+    return { name, index: index + 1, x0, y0, w, h, cm: colMap, tc, tctx: tc.getContext("2d"), tb, timg: new ImageData(new Uint8ClampedArray(tb.buffer), w, h),
+             sx: 1, sy: 1, vx: 0, vy: 0, next: 1 + index * .37, stemX: x0 + cx, stemY: y0 + sy,
+             earL: [x0 + Math.round(w * .2), y0 + colTop(Math.round(w * .2))], earR: [x0 + Math.round(w * .8), y0 + colTop(Math.round(w * .8))], k: ((index * 37) % 17) / 8 - 1, dir: [1, -1, -1, 1, 1, -1, 1, -1, 1, 1, -1, -1, 1][index], dm: Float32Array.from(dm), sp: Float32Array.from(sp), idx: Int32Array.from(idx), col: Float32Array.from(col), row: Int32Array.from(row), path, ribPath: null, ribStep: -1 };
+  }
+  function buildRibs() {
+    for (const t of tiles) {
+      t.ribPath = null;
+      if (!state.ribs) continue;
+      const lines = [];
+      for (let lon = -180; lon <= 180; lon += state.ribs) {
+        const l = []; for (let lat = -90; lat <= 90; lat += 2) l.push([lon, lat]); lines.push(l);
+      }
+      const p = new Path2D();
+      const g = { moveTo: (x, y) => p.moveTo(x, y), lineTo: (x, y) => p.lineTo(x, y), closePath: () => p.closePath(), arc: () => {}, rect: () => {} };
+      t.path.context(g)({ type: "MultiLineString", coordinates: lines });
+      t.ribPath = p;
+    }
+  }
+
+  // ---- shading: per-pixel body / spill / glow colours, rebuilt when palette, ribs or style change ----
+  const rgbOf = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+  const pack = (r, g, b) => (255 << 24) | (Math.min(255, b | 0) << 16) | (Math.min(255, g | 0) << 8) | Math.min(255, r | 0);
+  function shade() {
+    const F = rgbOf(state.fillHex), G = rgbOf(state.glowHex), step = state.ribs || 0;
+    for (const t of tiles) {
+      const n = t.idx.length;
+      t.body = new Uint32Array(n); t.halo = new Uint32Array(n); t.glow = new Uint32Array(n);
+      for (let i = 0; i < n; i++) {
+        const lon = t.col[i] / TW * 360, groove = step ? .55 + .45 * Math.pow(Math.abs(Math.sin(Math.PI * lon / step)), .5) : 1;
+        const n = Math.abs(Math.sin(i * 12.9898 + t.index * 78.233) * 43758.5453) % 1;   // per-pixel dither, like riso grain
+        const kk = t.dm[i] * groove + (n - .5) * .24, k = .72 + (Math.round((Math.min(1.1, Math.max(.4, kk)) - .4) / .7 * 3) / 3 * .7) * .46, hi = 0;
+        const r = F[0] * k + hi, g = F[1] * k + hi, b = F[2] * k + hi;
+        t.body[i] = pack(r, g, b);
+        t.halo[i] = pack(r * .6 + G[0] * .4 * t.dm[i], g * .6 + G[1] * .4 * t.dm[i], b * .6 + G[2] * .4 * t.dm[i]);
+        t.glow[i] = pack(G[0] * (.82 + .18 * t.dm[i]), G[1] * (.82 + .18 * t.dm[i]), G[2] * (.82 + .18 * t.dm[i]));
+      }
+    }
+  }
+
+  // ---- render ----
+  let shift = 0, off = 0, vel = 0, dragging = false, hover = null, pulled = null, drawOrder = [], last = performance.now();
+  // the text ribbon running round the frame: top and bottom left to right, left edge upwards, right edge downwards
+  function paintStatic() {
+    const txt = (state.title.toUpperCase() || " ") + "  ", W = canvas.width, H = canvas.height, m = 11 * S;
+    ctx.save();
+    ctx.fillStyle = state.textHex; ctx.font = `bold ${10.5 * S}px "Helvetica Neue", Arial, sans-serif`; ctx.textBaseline = "middle";
+    const edge = (len, pad, place) => {
+      ctx.save(); place();
+      const w = ctx.measureText(txt).width;
+      ctx.beginPath(); ctx.rect(pad, -8 * S, len - 2 * pad, 16 * S); ctx.clip();
+      for (let x = -w * .06; x < len; x += w) ctx.fillText(txt, x, 0);
+      ctx.restore();
+    };
+    edge(W, 0, () => ctx.translate(0, m));
+    edge(W, 0, () => ctx.translate(0, H - m));
+    edge(H, 18 * S, () => { ctx.translate(m, H); ctx.rotate(-Math.PI / 2); });
+    edge(H, 18 * S, () => { ctx.translate(W - m, 0); ctx.rotate(Math.PI / 2); });
+    ctx.restore();
+  }
+  // each pumpkin is a damped spring on its x/y scale: plucked at random, or pulled by the pointer, it overshoots and settles back
+  function elastic(dt, time) {
+    const K = 110, C = 5.2;
+    // the poster is one fixed sheet: whatever area a pumpkin gains is taken from the others, nearest ones giving up the most
+    const grow = tiles.map(t => Math.max(0, t.sx * t.sy - 1));
+    for (const t of tiles) {
+      let press = 0;
+      tiles.forEach((o, j) => { if (o !== t && grow[j]) { const d = Math.hypot(o.x0 + o.w / 2 - t.x0 - t.w / 2, o.y0 + o.h / 2 - t.y0 - t.h / 2); press += grow[j] / (1 + (d / 250) ** 2) * .45; } });
+      t.tg = 1 - Math.min(.45, press);
+    }
+    for (const t of tiles) {
+      if (t === pulled) continue;
+      if (state.elastic && time > t.next) {
+        const a = (Math.random() < .5 ? -1 : 1) * (3 + Math.random() * 3);
+        if (Math.random() < .5) { t.vx += a; t.vy -= a * .6; } else { t.vy += a; t.vx -= a * .6; }
+        t.next = time + (6.5 - 5.5 * state.elastic / 100) * (.6 + Math.random() * .8);
+      }
+      const n = 4, h = dt / n;
+      for (let i = 0; i < n; i++) {
+        t.vx += (-K * (t.sx - t.tg) - C * t.vx) * h; t.vy += (-K * (t.sy - t.tg) - C * t.vy) * h;
+        t.sx = Math.min(3.2, Math.max(.4, t.sx + t.vx * h)); t.sy = Math.min(3.2, Math.max(.4, t.sy + t.vy * h));
+      }
+    }
+  }
+  // what sits on top of each body: a stem, cat ears or a candle flame
+  function drawTop(t) {
+    const x = t.stemX, y = t.stemY;
+    if (state.kind === "cat") {
+      // tall pointed ears set into the head at the top corners, same dark as the body, with a thin yellow trim inside the outer edge
+      const sz = Math.max(9 * S, Math.min(26 * S, Math.min(t.w, t.h) * .34)), hw = sz * .62;
+      for (const [e, d] of [[t.earL, -1], [t.earR, 1]]) {
+        const bx = e[0], by = e[1] + sz * .4, ax = bx + d * sz * .28, ay = by - sz * 1.4;
+        ctx.beginPath(); ctx.moveTo(bx - hw, by); ctx.lineTo(ax, ay); ctx.lineTo(bx + hw, by); ctx.closePath();
+        ctx.fillStyle = state.fillHex; ctx.fill();
+        const ix = bx - d * hw, mx = ax + (ix - ax) * .55, my = ay + (by - ay) * .55;   // inner base corner and a point partway down the inner edge
+        ctx.beginPath(); ctx.moveTo(bx + d * hw - d * sz * .17, by - sz * .1); ctx.lineTo(ax - d * sz * .05, ay + sz * .36); ctx.lineTo(mx + d * sz * .12, my + sz * .02);
+        ctx.strokeStyle = state.glowHex; ctx.lineWidth = 1.1 * S; ctx.lineCap = ctx.lineJoin = "round"; ctx.stroke();
+      }
+    } else if (state.kind === "ghost") {
+      const yb = y - 2 * S;
+      ctx.fillStyle = "#f4efe6"; ctx.fillRect(x - 3 * S, yb, 6 * S, 7 * S);
+      for (const [k, col] of [[1, "#ff8a1f"], [.5, "#ffd54a"]]) {
+        ctx.beginPath(); ctx.moveTo(x, yb - 12 * S * k); ctx.quadraticCurveTo(x + 5.5 * S * k, yb - 4 * S * k, x, yb - S); ctx.quadraticCurveTo(x - 5.5 * S * k, yb - 4 * S * k, x, yb - 12 * S * k); ctx.fillStyle = col; ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = "#56742f";
+      ctx.beginPath(); ctx.moveTo(x - 1.8 * S, y + 1.2 * S); ctx.quadraticCurveTo(x - 1.2 * S, y - 2 * S, x + .6 * S, y - 3.6 * S);
+      ctx.lineTo(x + 2.2 * S, y - 2.8 * S); ctx.quadraticCurveTo(x + 1.4 * S, y - .6 * S, x + 1.8 * S, y + 1.2 * S); ctx.closePath(); ctx.fill();
+    }
+  }
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (state.playing) shift += state.speed / 360 * TW * dt;
+    if (!dragging) { off += vel * dt; vel *= Math.exp(-3 * dt); }
+    elastic(dt, now / 1000);
+    ctx.putImageData(bgImg, 0, 0);
+    ctx.lineJoin = "round";
+    const c3 = state.c3, c4 = state.c4, c5 = state.c5;
+    drawOrder = tiles.slice().sort((a, b) => Math.abs(a.sx - 1) + Math.abs(a.sy - 1) - Math.abs(b.sx - 1) - Math.abs(b.sy - 1));   // most stretched drawn last, on top
+    for (const t of drawOrder) {
+      const { idx, col, row, body, halo, glow, tb } = t, tex = texs[(t.index - 1) % 4];
+      const sh = (((Math.round(shift * t.dir * (1 + state.chaos / 100 * t.k * .8) + off)) % TW) + TW) % TW;
+      for (let i = 0; i < idx.length; i++) {
+        let c = (col[i] | 0) + sh; if (c >= TW) c -= TW; if (c < 0) c += TW;
+        const v = tex[row[i] + c]; tb[idx[i]] = v === 0 ? body[i] : v === 1 ? glow[i] : v === 2 ? halo[i] : v === 3 ? c3 : v === 4 ? c4 : c5;
+      }
+      t.tctx.putImageData(t.timg, 0, 0);
+      const cx = t.x0 + t.w / 2, cy = t.y0 + t.h / 2;
+      ctx.save(); ctx.translate(cx, cy); ctx.scale(t.sx, t.sy); ctx.translate(-cx, -cy);
+      ctx.drawImage(t.tc, t.x0, t.y0);
+      if (t.ribPath) {
+        ctx.strokeStyle = "rgba(30,8,20,.38)"; ctx.lineWidth = 1.1 * S; ctx.stroke(t.ribPath);
+        ctx.save(); ctx.translate(1.4 * S, .9 * S);   // second ink layer printed slightly off register
+        ctx.strokeStyle = state.ribHex; ctx.globalAlpha = .85; ctx.lineWidth = .9 * S; ctx.stroke(t.ribPath);
+        ctx.restore();
+      }
+      if (state.stems) drawTop(t);
+      ctx.restore();
+    }
+    paintStatic();
+    ctx.drawImage(grain, 0, 0);
+    requestAnimationFrame(frame);
+  }
+  // risograph-style ground: one flat ink with soft uneven coverage and fine speckle (seeded, so it is stable)
+  let bgImg = null, grain = null;
+  const scaleHex = (h, k) => { const n = parseInt(h.slice(1), 16); return `rgb(${Math.min(255, (n >> 16) * k) | 0},${Math.min(255, ((n >> 8) & 255) * k) | 0},${Math.min(255, (n & 255) * k) | 0})`; };
+  const seeded = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  function makeBg() {
+    const c = document.createElement("canvas"); c.width = canvas.width; c.height = canvas.height;
+    const g = c.getContext("2d"), rnd = seeded(7); g.fillStyle = state.bgHex; g.fillRect(0, 0, c.width, c.height);
+    for (let i = 0; i < 70; i++) {
+      const x = rnd() * c.width, y = rnd() * c.height, r = (30 + rnd() * 120) * S, dark = rnd() < .55, col = scaleHex(state.bgHex, dark ? .8 : 1.18);
+      const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, col); gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.globalAlpha = .1 + rnd() * .14; g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    g.globalAlpha = .5;
+    for (let i = 0; i < 24000; i++) { g.fillStyle = scaleHex(state.bgHex, rnd() < .55 ? .72 : 1.28); const z = (.4 + rnd() * 1.1) * S; g.fillRect(rnd() * c.width, rnd() * c.height, z, z); }
+    bgImg = g.getImageData(0, 0, c.width, c.height);
+  }
+  // grain laid over the whole print, ink and paper speckle
+  function makeGrain() {
+    grain = document.createElement("canvas"); grain.width = canvas.width; grain.height = canvas.height;
+    const g = grain.getContext("2d"), rnd = seeded(31);
+    for (let i = 0; i < 26000; i++) {
+      const z = (.35 + rnd() * rnd() * 2.2) * S, dark = rnd() < .5;
+      g.fillStyle = dark ? `rgba(20,8,24,${.1 + rnd() * .2})` : `rgba(255,248,235,${.08 + rnd() * .2})`;
+      g.fillRect(rnd() * grain.width, rnd() * grain.height, z, z);
+    }
+  }
+
+  // ---- controls ----
+  const out = (id, v, suf = "") => { $(id + "O").textContent = v + suf; };
+  function sync() {
+    state.title = $("title").value;
+    state.speed = +$("speed").value; state.ribs = +$("ribs").value; state.chaos = +$("chaos").value; state.elastic = +$("elastic").value; state.stems = $("stems").checked;
+    out("speed", state.speed, "°/с"); out("chaos", state.chaos, "%"); out("elastic", state.elastic || "вимк.", state.elastic ? "%" : ""); out("ribs", state.ribs || "вимк.", state.ribs ? "°" : "");
+      }
+    for (const id of ["title", "speed", "chaos", "elastic", "stems"]) $(id).addEventListener("input", sync);
+  $("ribs").addEventListener("input", () => { sync(); buildRibs(); shade(); });
+  $("cFill").addEventListener("input", e => { state.fill = hex32(e.target.value); state.fillHex = e.target.value; shade(); });
+  $("cGlow").addEventListener("input", e => { state.glow = hex32(e.target.value); state.glowHex = e.target.value; shade(); });
+  $("cText").addEventListener("input", e => { state.textHex = e.target.value; });
+  $("cAcc").addEventListener("input", e => { state.c3 = hex32(e.target.value); });
+  $("cBg").addEventListener("input", e => { state.bgHex = e.target.value; makeBg(); });
+  $("play").addEventListener("click", e => { state.playing = !state.playing; e.target.textContent = state.playing ? "Пауза" : "Грати"; });
+
+  // a preset = which character, its colours, rib spacing and the accent used for noses, mouths and eyes
+  const mk = (kind, pal, ribs, c3, c4 = "#ffffff") => ({ kind, pal, ribs, c3, c4 });
+  const PRESETS = {
+    halloween: mk("pumpkin", ["#2b46d1", "#ff6a13", "#ffd54a", "#ff4f9a"], 12, "#ff6a1f"),
+    toxic: mk("pumpkin", ["#0d0b14", "#5b2bb5", "#b6ff3c", "#ff3c7d"], 12, "#b6ff3c"),
+    ice: mk("pumpkin", ["#0a2a66", "#7fc4ff", "#ffffff", "#ffd0e6"], 12, "#ffffff"),
+    gum: mk("pumpkin", ["#ff6fc0", "#ff9a3c", "#fff1a8", "#ffffff"], 12, "#fff1a8"),
+    mono: mk("pumpkin", ["#151515", "#d8d8d8", "#ffffff", "#8a8a8a"], 12, "#ffffff"),
+    cat: mk("cat", ["#6c7fc4", "#2a1812", "#e4e23a", "#ff5fa8"], 0, "#ff6a1f"),
+    ghost: mk("ghost", ["#e8651f", "#ebe7e0", "#ffd54a", "#8da0d0"], 22, "#1b1020"),
+  };
+  $("preset").addEventListener("change", e => {
+    const P = PRESETS[e.target.value], [bg, fill, glow, rib] = P.pal;
+    state.kind = P.kind; state.ribHex = rib; state.c4 = hex32(P.c4);
+    $("ribs").value = P.ribs; $("ribs").dispatchEvent(new Event("input"));
+    for (const [id, v] of [["cBg", bg], ["cFill", fill], ["cGlow", glow], ["cAcc", P.c3]]) { $(id).value = v; $(id).dispatchEvent(new Event("input")); }
+    buildTextures(); shade();
+  });
+
+  // drag a pumpkin to stretch it (it snaps back like elastic); drag the background to spin them all
+  const hint = $("hint"), HINT = "Потягніть гарбуз, щоб розтягнути його. Тягніть по фону, щоб крутити.";
+  hint.textContent = HINT;
+  const pos = e => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * canvas.width, (e.clientY - r.top) / r.height * canvas.height, r.width]; };
+  const pick = (px, py) => {
+    for (let i = drawOrder.length - 1; i >= 0; i--) {
+      const t = drawOrder[i], cx = t.x0 + t.w / 2, cy = t.y0 + t.h / 2;
+      const x = Math.floor(cx + (px - cx) / t.sx) - t.x0, y = Math.floor(cy + (py - cy) / t.sy) - t.y0;
+      if (x >= 0 && y >= 0 && x < t.w && y < t.h && t.cm[y * t.w + x] >= 0) return t;
+    }
+    return null;
+  };
+  let lastX = 0, lastT = 0, startX = 0, startY = 0;
+  canvas.addEventListener("pointerdown", e => {
+    const [px, py] = pos(e); canvas.setPointerCapture(e.pointerId); canvas.style.cursor = "grabbing";
+    pulled = pick(px, py);
+    if (pulled) { startX = px; startY = py; pulled.vx = pulled.vy = 0; return; }
+    dragging = true; vel = 0; lastX = e.clientX; lastT = performance.now();
+  });
+  canvas.addEventListener("pointermove", e => {
+    const [px, py, rw] = pos(e);
+    if (pulled) {
+      const t = pulled;
+      t.sx = Math.min(3.2, Math.max(.4, 1 + (px - startX) / t.w * 2.4)); t.sy = Math.min(3.2, Math.max(.4, 1 + (py - startY) / t.h * 2.4));
+      t.vx = t.vy = 0; return;
+    }
+    if (dragging) {
+      const now = performance.now(), d = (e.clientX - lastX) / rw * TW * 1.2, dtm = Math.max(1, now - lastT) / 1000;
+      off += d; vel = d / dtm * .6 + vel * .4; lastX = e.clientX; lastT = now;
+    }
+    hover = pick(px, py);
+    hint.textContent = hover ? `${hover.index}. ${hover.name}` : HINT;
+  });
+  const end = () => { dragging = false; pulled = null; canvas.style.cursor = "grab"; };
+  canvas.addEventListener("pointerup", end); canvas.addEventListener("pointercancel", end);
+  canvas.addEventListener("pointerleave", () => { hover = null; hint.textContent = HINT; });
+
+  // ---- init ----
+  sync(); buildTextures();
+  TILES.forEach((d, i) => tiles.push(buildTile(d, i)));
+  buildRibs(); shade(); makeBg(); makeGrain();
+  requestAnimationFrame(t => { last = t; frame(t); });
+})();
+</script>
+</body>
+</html>
